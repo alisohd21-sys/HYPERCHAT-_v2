@@ -1,0 +1,156 @@
+ط<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HyperChat Fix</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* التنسيق الذي طلبته (واتساب + ماسنجر) */
+        :root { --blue: #0084ff; --bg: #f0f2f5; }
+        * { box-sizing: border-box; font-family: sans-serif; margin: 0; padding: 0; }
+        body { background: #cfd8dc; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .hidden { display: none !important; }
+        
+        /* شاشة الدخول */
+        #auth-screen { background: white; padding: 30px; border-radius: 15px; text-align: center; width: 350px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 10px; }
+        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-google { background: #db4437; color: white; }
+        .btn-login { background: var(--blue); color: white; }
+
+        /* التطبيق */
+        #main-app { width: 100%; height: 100vh; background: white; display: flex; }
+        .sidebar { width: 300px; border-left: 1px solid #ddd; display: flex; flex-direction: column; }
+        .chat-list { flex: 1; overflow-y: auto; }
+        .chat-item { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .chat-item:hover { background: #f5f5f5; }
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: #e5e7eb; }
+        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 10px; border-radius: 10px; max-width: 70%; }
+        .sent { align-self: flex-start; background: #e1ffc7; }
+        .received { align-self: flex-end; background: white; }
+        .input-box { padding: 15px; background: white; display: flex; gap: 10px; }
+        input { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen">
+        <h2>HyperChat</h2>
+        <input type="email" id="email" placeholder="البريد" style="padding:10px; border-radius:5px; border:1px solid #ddd;">
+        <input type="password" id="pass" placeholder="كلمة المرور" style="padding:10px; border-radius:5px; border:1px solid #ddd;">
+        <button id="btn-login" class="btn-login">دخول</button>
+        <button id="btn-google" class="btn-google">الدخول عبر Google</button>
+    </div>
+
+    <div id="main-app" class="hidden">
+        <div class="sidebar">
+            <div style="padding:15px; background:#f0f2f5; font-weight:bold;">المحادثات</div>
+            <div id="chat-list" class="chat-list"></div>
+            <button id="btn-logout" style="background:#ff5252; color:white; margin:10px;">خروج</button>
+        </div>
+        <div class="chat-area">
+            <div id="chat-title" style="padding:15px; background:white; font-weight:bold;">اختر محادثة</div>
+            <div id="messages" class="messages"></div>
+            <form id="msg-form" class="input-box hidden">
+                <input type="text" id="msg-input" placeholder="اكتب رسالة...">
+                <button type="submit" style="background:var(--blue); color:white; border-radius:50%; width:40px;"><i class="fa-solid fa-paper-plane"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, getDocs, query, onSnapshot, where, addDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // إعداداتك
+        const firebaseConfig = {
+            apiKey: "AIzaSyBW1lS6QkWv4XKjswEykFcHlttlxZc5NHU",
+            authDomain: "hyperchat-ff63f.firebaseapp.com",
+            projectId: "hyperchat-ff63f",
+            storageBucket: "hyperchat-ff63f.firebasestorage.app",
+            messagingSenderId: "1024781406095",
+            appId: "1:1024781406095:web:b5da5b813feb81f22f05fa"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // 1. مراقبة حالة الدخول (الإصلاح الجذري)
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                loadUsers();
+            } else {
+                document.getElementById('auth-screen').classList.remove('hidden');
+                document.getElementById('main-app').classList.add('hidden');
+            }
+        });
+
+        // 2. تسجيل دخول جوجل
+        document.getElementById('btn-google').onclick = () => {
+            signInWithPopup(auth, new GoogleAuthProvider()).catch(e => alert("افتح الملف عبر Live Server!"));
+        };
+
+        // 3. تحميل المستخدمين وفتح المحادثة (إصلاح النقل)
+        async function loadUsers() {
+            const list = document.getElementById('chat-list');
+            list.innerHTML = `<div class="chat-item">الكروب العام (اضغط هنا)</div>`;
+            
+            // إضافة حدث الضغط يدوياً لضمان العمل
+            list.firstChild.onclick = () => openChat('global', 'الكروب العام');
+
+            const snap = await getDocs(collection(db, "users"));
+            snap.forEach(uDoc => {
+                const u = uDoc.data();
+                if(u.uid !== auth.currentUser.uid) {
+                    const item = document.createElement('div');
+                    item.className = 'chat-item';
+                    item.innerText = u.name;
+                    item.onclick = () => openChat([auth.currentUser.uid, u.uid].sort().join('_'), u.name);
+                    list.appendChild(item);
+                }
+            });
+        }
+
+        let unsub = null;
+        function openChat(id, name) {
+            document.getElementById('chat-title').innerText = name;
+            document.getElementById('msg-form').classList.remove('hidden');
+            if (unsub) unsub();
+
+            const q = query(collection(db, "messages"), where("chatId", "==", id), orderBy("timestamp", "asc"));
+            unsub = onSnapshot(q, (snap) => {
+                const box = document.getElementById('messages');
+                box.innerHTML = "";
+                snap.forEach(d => {
+                    const m = d.data();
+                    const div = document.createElement('div');
+                    div.className = `msg ${m.senderId === auth.currentUser.uid ? 'sent' : 'received'}`;
+                    div.innerText = m.text;
+                    box.appendChild(div);
+                });
+                box.scrollTop = box.scrollHeight;
+            });
+
+            document.getElementById('msg-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const input = document.getElementById('msg-input');
+                if(!input.value.trim()) return;
+                await addDoc(collection(db, "messages"), {
+                    chatId: id,
+                    text: input.value,
+                    senderId: auth.currentUser.uid,
+                    timestamp: serverTimestamp()
+                });
+                input.value = "";
+            };
+        }
+
+        document.getElementById('btn-logout').onclick = () => signOut(auth);
+    </script>
+</body>
+</html>
