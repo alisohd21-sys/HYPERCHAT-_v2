@@ -1,156 +1,268 @@
-ط<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HyperChat Fix</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>HyperChat Ultimate</title>
     <style>
-        /* التنسيق الذي طلبته (واتساب + ماسنجر) */
-        :root { --blue: #0084ff; --bg: #f0f2f5; }
-        * { box-sizing: border-box; font-family: sans-serif; margin: 0; padding: 0; }
-        body { background: #cfd8dc; height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .hidden { display: none !important; }
-        
-        /* شاشة الدخول */
-        #auth-screen { background: white; padding: 30px; border-radius: 15px; text-align: center; width: 350px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 10px; }
-        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        .btn-google { background: #db4437; color: white; }
-        .btn-login { background: var(--blue); color: white; }
+        /* --- المتغيرات اللونية --- */
+        :root {
+            --bg-body: #f4f7f6;
+            --bg-side: #ffffff;
+            --text-main: #2c3e50;
+            --primary: #00a884;
+            --accent: #00a884;
+            --bubble-me: #dcf8c6;
+            --bubble-other: #ffffff;
+            --border: #e9ecef;
+        }
 
-        /* التطبيق */
-        #main-app { width: 100%; height: 100vh; background: white; display: flex; }
-        .sidebar { width: 300px; border-left: 1px solid #ddd; display: flex; flex-direction: column; }
-        .chat-list { flex: 1; overflow-y: auto; }
-        .chat-item { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; }
-        .chat-item:hover { background: #f5f5f5; }
-        .chat-area { flex: 1; display: flex; flex-direction: column; background: #e5e7eb; }
-        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .msg { padding: 10px; border-radius: 10px; max-width: 70%; }
-        .sent { align-self: flex-start; background: #e1ffc7; }
-        .received { align-self: flex-end; background: white; }
-        .input-box { padding: 15px; background: white; display: flex; gap: 10px; }
-        input { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ddd; }
+        [data-theme="dark"] {
+            --bg-body: #0b141a;
+            --bg-side: #111b21;
+            --text-main: #e9edef;
+            --primary: #00a884;
+            --bubble-me: #005c4b;
+            --bubble-other: #202c33;
+            --border: #222d34;
+        }
+
+        * { box-sizing: border-box; transition: 0.3s background, 0.3s color; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { margin: 0; background: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+
+        /* --- شاشة الدخول --- */
+        #login-page { position: fixed; inset: 0; background: var(--primary); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+        .login-card { background: var(--bg-side); padding: 40px; border-radius: 25px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+
+        /* --- الهيكل الرئيسي --- */
+        .sidebar { width: 350px; background: var(--bg-side); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+        .chat-area { flex-grow: 1; display: flex; flex-direction: column; position: relative; }
+
+        /* --- العناوين والأزرار --- */
+        .top-nav { padding: 15px; background: var(--bg-side); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .btn-icon { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: var(--text-main); padding: 8px; border-radius: 50%; }
+        .btn-icon:hover { background: rgba(0,0,0,0.05); }
+
+        /* --- زر البحث المحسن --- */
+        .search-container { padding: 15px; position: relative; }
+        .search-input { width: 100%; padding: 12px 40px 12px 15px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-main); outline: none; }
+        .search-icon { position: absolute; right: 25px; top: 25px; color: var(--text-main); opacity: 0.6; }
+
+        /* --- المجموعات والأقسام --- */
+        .group-item { padding: 15px; margin: 5px 10px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 12px; }
+        .group-item:hover { background: rgba(0,a,0,0.05); }
+        .group-item.active { background: var(--primary); color: white; }
+        
+        .sections-bar { padding: 10px; display: flex; gap: 10px; overflow-x: auto; background: var(--bg-side); border-bottom: 1px solid var(--border); }
+        .section-pill { padding: 6px 18px; border-radius: 20px; background: var(--bg-body); font-size: 13px; cursor: pointer; white-space: nowrap; border: 1px solid var(--border); }
+        .section-pill.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* --- الدردشة --- */
+        #messages { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: var(--bg-body); }
+        .bubble { max-width: 70%; padding: 12px; border-radius: 15px; font-size: 14.5px; line-height: 1.4; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .bubble.me { align-self: flex-end; background: var(--bubble-me); color: #000; border-bottom-left-radius: 2px; }
+        [data-theme="dark"] .bubble.me { color: #fff; }
+        .bubble.other { align-self: flex-start; background: var(--bubble-other); border-bottom-right-radius: 2px; }
+        
+        .input-bar { padding: 15px; background: var(--bg-side); display: flex; gap: 12px; align-items: center; }
+        .input-bar input { flex: 1; border: none; padding: 14px 20px; border-radius: 30px; background: var(--bg-body); color: var(--text-main); outline: none; }
+
+        @media (max-width: 768px) {
+            .sidebar { position: absolute; width: 100%; height: 100%; z-index: 100; transform: translateX(100%); }
+            .sidebar.show { transform: translateX(0); }
+        }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div id="auth-screen">
-        <h2>HyperChat</h2>
-        <input type="email" id="email" placeholder="البريد" style="padding:10px; border-radius:5px; border:1px solid #ddd;">
-        <input type="password" id="pass" placeholder="كلمة المرور" style="padding:10px; border-radius:5px; border:1px solid #ddd;">
-        <button id="btn-login" class="btn-login">دخول</button>
-        <button id="btn-google" class="btn-google">الدخول عبر Google</button>
-    </div>
-
-    <div id="main-app" class="hidden">
-        <div class="sidebar">
-            <div style="padding:15px; background:#f0f2f5; font-weight:bold;">المحادثات</div>
-            <div id="chat-list" class="chat-list"></div>
-            <button id="btn-logout" style="background:#ff5252; color:white; margin:10px;">خروج</button>
-        </div>
-        <div class="chat-area">
-            <div id="chat-title" style="padding:15px; background:white; font-weight:bold;">اختر محادثة</div>
-            <div id="messages" class="messages"></div>
-            <form id="msg-form" class="input-box hidden">
-                <input type="text" id="msg-input" placeholder="اكتب رسالة...">
-                <button type="submit" style="background:var(--blue); color:white; border-radius:50%; width:40px;"><i class="fa-solid fa-paper-plane"></i></button>
-            </form>
+    <div id="login-page">
+        <div class="login-card">
+            <h1 style="color:var(--primary)">HyperChat</h1>
+            <p>تواصل بذكاء وخصوصية</p>
+            <button id="btn-google" style="padding:12px 30px; background:#4285F4; color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">دخول بجوجل</button>
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, getDocs, query, onSnapshot, where, addDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    <aside class="sidebar" id="sidebar">
+        <div class="top-nav">
+            <img id="user-avatar" src="" style="width:40px; height:40px; border-radius:50%">
+            <div>
+                <button class="btn-icon" onclick="toggleTheme()" title="تبديل الوضع">🌓</button>
+                <button class="btn-icon" onclick="createGroup()" title="مجموعة جديدة">➕</button>
+            </div>
+        </div>
 
-        // إعداداتك
-        const firebaseConfig = {
-            apiKey: "AIzaSyBW1lS6QkWv4XKjswEykFcHlttlxZc5NHU",
-            authDomain: "hyperchat-ff63f.firebaseapp.com",
-            projectId: "hyperchat-ff63f",
-            storageBucket: "hyperchat-ff63f.firebasestorage.app",
-            messagingSenderId: "1024781406095",
-            appId: "1:1024781406095:web:b5da5b813feb81f22f05fa"
-        };
+        <div class="search-container">
+            <span class="search-icon">🔍</span>
+            <input type="email" id="user-search" class="search-input" placeholder="ابحث عن صديق بالبريد...">
+            <div id="search-results" style="margin-top:10px"></div>
+        </div>
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        <div id="group-list" style="overflow-y:auto; flex:1"></div>
+    </aside>
 
-        // 1. مراقبة حالة الدخول (الإصلاح الجذري)
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                document.getElementById('auth-screen').classList.add('hidden');
-                document.getElementById('main-app').classList.remove('hidden');
-                loadUsers();
-            } else {
-                document.getElementById('auth-screen').classList.remove('hidden');
-                document.getElementById('main-app').classList.add('hidden');
-            }
+    <main class="chat-area">
+        <header class="top-nav">
+            <button class="btn-icon mobile-only" onclick="toggleSidebar()">☰</button>
+            <strong id="chat-title">اختر محادثة</strong>
+            <button class="btn-icon" id="add-sec-btn" onclick="addNewSection()" style="display:none">⚙️ أضف قسم</button>
+        </header>
+
+        <div class="sections-bar hidden" id="sections-bar"></div>
+
+        <div id="messages"></div>
+
+        <div class="input-bar">
+            <input type="text" id="msg-input" placeholder="اكتب رسالتك...">
+            <button class="btn-icon" id="btn-send" style="background:var(--primary); color:white; width:45px; height:45px;">➤</button>
+        </div>
+    </main>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, doc, updateDoc, arrayUnion, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBW1lS6QkWv4XKjswEykFcHlttlxZc5NHU",
+        authDomain: "hyperchat-ff63f.firebaseapp.com",
+        projectId: "hyperchat-ff63f",
+        storageBucket: "hyperchat-ff63f.firebasestorage.app",
+        messagingSenderId: "1024781406095",
+        appId: "1:1024781406095:web:589ac28cafd2826f2f05fa",
+        measurementId: "G-VNSFFCT36P"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    let user = null;
+    let activeGroupId = null;
+    let activeSection = "عام";
+
+    // --- تبديل الدارك مود ---
+    window.toggleTheme = () => {
+        const theme = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        document.body.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    };
+    if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
+
+    // --- المصادقة ---
+    document.getElementById('btn-google').onclick = () => signInWithPopup(auth, new GoogleAuthProvider());
+
+    onAuthStateChanged(auth, (u) => {
+        if (u) {
+            user = u;
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('user-avatar').src = u.photoURL;
+            saveUserRecord(u);
+            listenToGroups();
+        }
+    });
+
+    async function saveUserRecord(u) {
+        const q = query(collection(db, "users"), where("uid", "==", u.uid));
+        const snap = await getDocs(q);
+        if(snap.empty) await addDoc(collection(db, "users"), { uid:u.uid, name:u.displayName, email:u.email, photo:u.photoURL });
+    }
+
+    // --- البحث عن صديق ---
+    document.getElementById('user-search').oninput = async (e) => {
+        const email = e.target.value.trim();
+        if(email.length < 5) return;
+        const q = query(collection(db, "users"), where("email", "==", email));
+        const snap = await getDocs(q);
+        const resBox = document.getElementById('search-results');
+        resBox.innerHTML = "";
+        snap.forEach(d => {
+            const u = d.data();
+            const div = document.createElement('div');
+            div.innerHTML = `<button style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--primary); cursor:pointer">مراسلة ${u.name}</button>`;
+            div.onclick = () => alert("انسخ كود مجموعتك وشاركه معه للانضمام!");
+            resBox.appendChild(div);
+        });
+    };
+
+    // --- المجموعات والأقسام ---
+    window.createGroup = async () => {
+        const name = prompt("اسم المجموعة الفاخرة:");
+        if(!name) return;
+        const code = Math.random().toString(36).substring(7).toUpperCase();
+        await addDoc(collection(db, "groups"), {
+            name, admin: user.uid, members: [user.uid], sections: ["عام"], inviteCode: code, createdAt: serverTimestamp()
+        });
+    };
+
+    function listenToGroups() {
+        const q = query(collection(db, "groups"), where("members", "array-contains", user.uid));
+        onSnapshot(q, (snap) => {
+            const list = document.getElementById('group-list');
+            list.innerHTML = "";
+            snap.forEach(d => {
+                const g = d.data();
+                const div = document.createElement('div');
+                div.className = `group-item ${activeGroupId === d.id ? 'active' : ''}`;
+                div.innerHTML = `<span>🏢</span> <div><strong>${g.name}</strong><br><small>${g.inviteCode}</small></div>`;
+                div.onclick = () => selectGroup(d.id, g);
+                list.appendChild(div);
+            });
+        });
+    }
+
+    function selectGroup(id, data) {
+        activeGroupId = id;
+        activeSection = "عام";
+        document.getElementById('chat-title').innerText = data.name;
+        document.getElementById('add-sec-btn').style.display = (data.admin === user.uid) ? 'block' : 'none';
+        
+        const bar = document.getElementById('sections-bar');
+        bar.classList.remove('hidden');
+        bar.innerHTML = "";
+        data.sections.forEach(s => {
+            const p = document.createElement('div');
+            p.className = `section-pill ${activeSection === s ? 'active' : ''}`;
+            p.innerText = s;
+            p.onclick = () => { activeSection = s; selectGroup(id, data); };
+            bar.appendChild(p);
         });
 
-        // 2. تسجيل دخول جوجل
-        document.getElementById('btn-google').onclick = () => {
-            signInWithPopup(auth, new GoogleAuthProvider()).catch(e => alert("افتح الملف عبر Live Server!"));
-        };
+        loadMessages();
+        if(window.innerWidth < 768) toggleSidebar();
+    }
 
-        // 3. تحميل المستخدمين وفتح المحادثة (إصلاح النقل)
-        async function loadUsers() {
-            const list = document.getElementById('chat-list');
-            list.innerHTML = `<div class="chat-item">الكروب العام (اضغط هنا)</div>`;
-            
-            // إضافة حدث الضغط يدوياً لضمان العمل
-            list.firstChild.onclick = () => openChat('global', 'الكروب العام');
+    window.addNewSection = async () => {
+        const sName = prompt("اسم القسم الجديد:");
+        if(sName) await updateDoc(doc(db, "groups", activeGroupId), { sections: arrayUnion(sName) });
+    };
 
-            const snap = await getDocs(collection(db, "users"));
-            snap.forEach(uDoc => {
-                const u = uDoc.data();
-                if(u.uid !== auth.currentUser.uid) {
-                    const item = document.createElement('div');
-                    item.className = 'chat-item';
-                    item.innerText = u.name;
-                    item.onclick = () => openChat([auth.currentUser.uid, u.uid].sort().join('_'), u.name);
-                    list.appendChild(item);
-                }
+    // --- الرسائل ---
+    function loadMessages() {
+        const q = query(collection(db, "messages"), where("groupId", "==", activeGroupId), where("section", "==", activeSection), orderBy("timestamp", "asc"));
+        onSnapshot(q, (snap) => {
+            const box = document.getElementById('messages');
+            box.innerHTML = "";
+            snap.forEach(d => {
+                const m = d.data();
+                const div = document.createElement('div');
+                div.className = `bubble ${m.senderId === user.uid ? 'me' : 'other'}`;
+                const t = m.timestamp?.toDate().toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
+                div.innerHTML = `<div>${m.text}</div><small style="font-size:9px; opacity:0.6">${t || 'الآن'}</small>`;
+                box.appendChild(div);
             });
-        }
+            box.scrollTop = box.scrollHeight;
+        });
+    }
 
-        let unsub = null;
-        function openChat(id, name) {
-            document.getElementById('chat-title').innerText = name;
-            document.getElementById('msg-form').classList.remove('hidden');
-            if (unsub) unsub();
+    document.getElementById('btn-send').onclick = async () => {
+        const inp = document.getElementById('msg-input');
+        if(!inp.value || !activeGroupId) return;
+        await addDoc(collection(db, "messages"), { groupId: activeGroupId, section: activeSection, senderId: user.uid, text: inp.value, timestamp: serverTimestamp() });
+        inp.value = "";
+    };
 
-            const q = query(collection(db, "messages"), where("chatId", "==", id), orderBy("timestamp", "asc"));
-            unsub = onSnapshot(q, (snap) => {
-                const box = document.getElementById('messages');
-                box.innerHTML = "";
-                snap.forEach(d => {
-                    const m = d.data();
-                    const div = document.createElement('div');
-                    div.className = `msg ${m.senderId === auth.currentUser.uid ? 'sent' : 'received'}`;
-                    div.innerText = m.text;
-                    box.appendChild(div);
-                });
-                box.scrollTop = box.scrollHeight;
-            });
-
-            document.getElementById('msg-form').onsubmit = async (e) => {
-                e.preventDefault();
-                const input = document.getElementById('msg-input');
-                if(!input.value.trim()) return;
-                await addDoc(collection(db, "messages"), {
-                    chatId: id,
-                    text: input.value,
-                    senderId: auth.currentUser.uid,
-                    timestamp: serverTimestamp()
-                });
-                input.value = "";
-            };
-        }
-
-        document.getElementById('btn-logout').onclick = () => signOut(auth);
-    </script>
+    window.toggleSidebar = () => document.getElementById('sidebar').classList.toggle('show');
+</script>
 </body>
 </html>
